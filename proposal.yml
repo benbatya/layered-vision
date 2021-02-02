@@ -1,0 +1,36 @@
+nodes:
+  - source: video_source
+    # id: bg  # id is optional. type name is default for id. Since each id must be unique in the graph,
+    # if two nodes of the same type are created, use id to identify them 
+    # Source: https://www.pexels.com/video/carnival-rides-operating-in-an-amusement-park-3031943/
+    input_path: "https://www.dropbox.com/s/oqftndbs29g8ekd/carnival-rides-operating-in-an-amusement-park-3031943-360p.mp4?dl=1"
+    repeat: true
+    preload: true
+  - source: webcam
+    device_path: "/dev/video0"
+    fourcc: "MJPG"
+  - filter: bodypix  # automatic connection from webcam.output to bodypix.input
+    model_path: "https://storage.googleapis.com/tfjs-models/savedmodel/bodypix/mobilenet/float/050/model-stride16.json"
+    # model_path: "https://storage.googleapis.com/tfjs-models/savedmodel/bodypix/resnet50/float/model-stride16.json"
+    internal_resolution: 0.5
+    threshold: 0.5
+  - filter: erode  
+    # input: bodypix.output # bodypix default output is the all mask
+    value: 20
+  - filter: dilate  # automatic connection
+    value: 19
+  - filter: box_blur
+    value: 10
+  - filter: motion_blur
+    frame_count: 3
+    decay: 0
+  - filter: composite
+    # input: motion_blur.output   # NOTE: this isn't needed. It would be the default connection anyway
+    input_fg: webcam.output
+    input_bg: video_source.output
+  - filter: auto_track      # crops input to crop_mask, adds a padding and then resizes back to the size of input array
+    # input: composite.output # NOTE: not needed
+    crop_input: bodypix.output_face # Alternative is a union node of bodypix.output_lface and bodypix.output_rface
+    padding: 20
+  - sink: v4l2_loopback
+    device_path: "/dev/video4"
